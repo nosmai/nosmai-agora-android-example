@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <application
+        android:allowBackup="false"
+        android:label="Nosmai + Agora"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+        android:hardwareAccelerated="true">
+
+        <!--
+          OpenCL access for the Nosmai SDK's GPU-accelerated ML path.
+
+          From Android 12 (API 31) an app may only dlopen a native library that is
+          BOTH in the vendor's public.libraries.txt AND declared here. Without
+          these the linker denies the dlopen and the SDK silently falls back to
+          CPU — slower, with no error surfaced anywhere obvious.
+
+          Vendors ship exactly one of these, hence required="false" on each:
+            Qualcomm / most -> libOpenCL.so
+            Pixel           -> libOpenCL-pixel.so only
+            Automotive      -> libOpenCL-car.so
+        -->
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL-pixel.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL-car.so" android:required="false" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

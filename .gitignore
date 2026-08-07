@@ -1,0 +1,23 @@
+*.iml
+.gradle/
+.idea/
+build/
+local.properties
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing material and build outputs — never commit these.
+*.jks
+*.keystore
+keystore.properties
+*.apk
+*.aab
+google-services.json
+
+# The Nosmai SDK is distributed separately — drop your copy here.
+app/libs/*.aar
+
+# Bundled effect packages are yours to supply.
+app/src/main/assets/filters/*.nosmai

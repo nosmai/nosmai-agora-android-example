@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nosmai Agora Portrait Viewer</title>
+<script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, system-ui, sans-serif;
+    background: #0d0f16; color: #e8eaf0; display: flex; flex-direction: column;
+    min-height: 100vh;
+  }
+  header { padding: 14px 18px; border-bottom: 1px solid #232733; }
+  h1 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  input {
+    background: #171a24; border: 1px solid #2c3140; color: #e8eaf0;
+    border-radius: 8px; padding: 8px 10px; font-size: 13px; min-width: 160px;
+  }
+  button {
+    background: #3b6cf6; color: #fff; border: 0; border-radius: 8px;
+    padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  button.secondary { background: #2c3140; }
+  button:disabled { opacity: .5; cursor: default; }
+  main {
+    flex: 1; display: flex; gap: 16px; padding: 16px 18px; flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  /* The key: the video container does NOT force landscape. It sizes to the
+     stream's true aspect. object-fit:contain shows the WHOLE frame, no crop. */
+  #stage {
+    background: #05060a; border: 1px solid #232733; border-radius: 12px;
+    /* A tall box so a portrait stream has room; the video inside is 'contain'. */
+    width: min(46vw, 420px); height: min(80vh, 740px);
+    overflow: hidden; position: relative;
+  }
+  /* Agora injects a wrapper div + a <video>. Make BOTH fill the stage so the
+     video is visible; object-fit:contain keeps the whole frame (no crop). */
+  #stage > div { width: 100% !important; height: 100% !important; }
+  #stage video {
+    width: 100% !important; height: 100% !important;
+    object-fit: contain !important; background: #000 !important;
+  }
+  #placeholder { position: absolute; inset: 0; display: flex;
+    align-items: center; justify-content: center; }
+  #placeholder { color: #6b7280; font-size: 13px; text-align: center; padding: 20px; }
+  aside {
+    flex: 1; min-width: 240px; background: #12141d; border: 1px solid #232733;
+    border-radius: 12px; padding: 14px 16px;
+  }
+  aside h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase;
+    letter-spacing: .06em; color: #8a91a3; }
+  .stat { display: flex; justify-content: space-between; padding: 6px 0;
+    border-bottom: 1px solid #1c202b; font-size: 14px; }
+  .stat b { font-variant-numeric: tabular-nums; }
+  .ok { color: #4ade80; } .warn { color: #fbbf24; } .err { color: #f87171; }
+  #log { margin-top: 12px; font-size: 12px; color: #8a91a3; white-space: pre-wrap;
+    max-height: 180px; overflow: auto; line-height: 1.5; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 700; }
+  .badge.portrait { background: #14532d; color: #4ade80; }
+  .badge.landscape { background: #7c2d12; color: #fdba74; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Nosmai · Agora Portrait Viewer</h1>
+  <div class="row">
+    <input id="appId" placeholder="App ID" value="" />
+    <input id="channel" placeholder="Channel" value="nosmai-demo" />
+    <input id="token" placeholder="Token (optional)" value="" />
+    <button id="joinBtn">Join</button>
+    <button id="leaveBtn" class="secondary" disabled>Leave</button>
+  </div>
+</header>
+<main>
+  <div id="stage"><div id="placeholder">No remote video yet.<br/>Join, then start streaming from the phone.</div></div>
+  <aside>
+    <h2>Received stream</h2>
+    <div class="stat"><span>Status</span><b id="status">idle</b></div>
+    <div class="stat"><span>Remote UID</span><b id="uid">—</b></div>
+    <div class="stat"><span>Video resolution</span><b id="res">—</b></div>
+    <div class="stat"><span>Orientation</span><b id="orient">—</b></div>
+    <div class="stat"><span>Aspect (w:h)</span><b id="aspect">—</b></div>
+    <div class="stat"><span>Framerate</span><b id="fps">—</b></div>
+    <div class="stat"><span>Bitrate</span><b id="bitrate">—</b></div>
+    <div id="log"></div>
+  </aside>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let client = null, remoteUser = null, statsTimer = null;
+function log(m){ const t = new Date().toLocaleTimeString(); $('log').textContent = `[${t}] ${m}\n` + $('log').textContent; }
+
+// Surface load / SDK problems immediately instead of a blank page.
+window.addEventListener('error', e => log('PAGE ERROR: ' + (e.message || e)));
+window.addEventListener('load', () => {
+  if (typeof AgoraRTC === 'undefined') {
+    log('AgoraRTC SDK failed to load (CDN blocked?). Video cannot work.');
+    $('status').textContent = 'SDK not loaded'; $('status').className = 'err';
+  } else {
+    log('AgoraRTC SDK v' + AgoraRTC.VERSION + ' loaded. Click Join.');
+    AgoraRTC.setLogLevel(1);
+  }
+});
+
+async function join() {
+  const appId = $('appId').value.trim();
+  const channel = $('channel').value.trim();
+  const token = $('token').value.trim() || null;
+  if (!appId || !channel) { alert('App ID and channel required'); return; }
+  $('joinBtn').disabled = true;
+  try {
+    // The SDK negotiates the real codec at the SFU, so vp8 here is fine.
+    client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
+    await client.setClientRole('audience');
+    client.on('user-published', async (user, mediaType) => {
+      log(`user-published uid=${user.uid} ${mediaType}`);
+      await client.subscribe(user, mediaType);
+      if (mediaType === 'video') {
+        remoteUser = user;
+        $('placeholder').style.display = 'none';
+        user.videoTrack.play('stage', { fit: 'contain', mirror: false });
+        $('uid').textContent = user.uid;
+        $('status').textContent = 'receiving';
+        $('status').className = 'ok';
+        startStats();
+      }
+    });
+    client.on('user-unpublished', (user, mediaType) => {
+      log(`user-unpublished uid=${user.uid} ${mediaType}`);
+      if (mediaType === 'video') { $('status').textContent = 'remote stopped'; $('status').className='warn'; }
+    });
+    const uid = await client.join(appId, channel, token, null);
+    log(`joined channel "${channel}" as audience uid=${uid}`);
+    $('status').textContent = 'joined, waiting for video';
+    $('leaveBtn').disabled = false;
+
+    // If the phone was ALREADY publishing before we joined, user-published
+    // won't fire again — subscribe to existing remote users now.
+    log(`remoteUsers already present: ${client.remoteUsers.length}`);
+    for (const u of client.remoteUsers) {
+      if (u.hasVideo) {
+        log(`subscribing to existing uid=${u.uid}`);
+        await client.subscribe(u, 'video');
+        remoteUser = u;
+        $('placeholder').style.display = 'none';
+        u.videoTrack.play('stage', { fit: 'contain', mirror: false });
+        $('uid').textContent = u.uid; $('status').textContent = 'receiving';
+        $('status').className = 'ok'; startStats();
+      }
+    }
+  } catch (e) {
+    log('JOIN ERROR: ' + (e && e.message ? e.message : e));
+    $('status').textContent = 'error'; $('status').className='err';
+    $('joinBtn').disabled = false;
+  }
+}
+
+function startStats() {
+  if (statsTimer) clearInterval(statsTimer);
+  statsTimer = setInterval(() => {
+    if (!remoteUser || !remoteUser.videoTrack) return;
+    // Read the actual <video> element the SDK created — its intrinsic size is
+    // the TRUE decoded frame size, before any CSS.
+    const v = document.querySelector('#stage video');
+    let w = 0, h = 0;
+    if (v && v.videoWidth) { w = v.videoWidth; h = v.videoHeight; }
+    // Also pull SDK stats as a cross-check.
+    let stats = null;
+    try { stats = client.getRemoteVideoStats()[remoteUser.uid]; } catch(e){}
+    if ((!w || !h) && stats) { w = stats.receiveResolutionWidth; h = stats.receiveResolutionHeight; }
+    if (w && h) {
+      $('res').textContent = `${w} × ${h}`;
+      const portrait = h > w;
+      $('orient').innerHTML = portrait
+        ? '<span class="badge portrait">PORTRAIT ✓</span>'
+        : '<span class="badge landscape">LANDSCAPE</span>';
+      const g = gcd(w, h);
+      $('aspect').textContent = `${w/g} : ${h/g}  (${(w/h).toFixed(3)})`;
+    }
+    if (stats) {
+      $('fps').textContent = (stats.receiveFrameRate || 0) + ' fps';
+      $('bitrate').textContent = Math.round((stats.receiveBitrate||0)/1000) + ' kbps';
+    }
+  }, 500);
+}
+function gcd(a,b){ return b ? gcd(b, a%b) : a; }
+
+async function leave() {
+  try {
+    if (statsTimer) { clearInterval(statsTimer); statsTimer = null; }
+    if (client) { await client.leave(); }
+    log('left channel');
+  } catch(e){ log('leave error: ' + e); }
+  $('status').textContent = 'idle'; $('status').className='';
+  $('res').textContent = $('orient').textContent = $('aspect').textContent = '—';
+  $('fps').textContent = $('bitrate').textContent = $('uid').textContent = '—';
+  $('placeholder').style.display = ''; $('stage').querySelectorAll('video,div:not(#placeholder)').forEach(n=>n.remove());
+  $('joinBtn').disabled = false; $('leaveBtn').disabled = true; remoteUser = null;
+}
+
+$('joinBtn').onclick = join;
+$('leaveBtn').onclick = leave;
+</script>
+</body>
+</html>
