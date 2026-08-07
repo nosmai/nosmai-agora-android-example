@@ -21,3 +21,6 @@ app/libs/*.aar
 
 # Bundled effect packages are yours to supply.
 app/src/main/assets/filters/*.nosmai
+
+# Belt and braces: no AAR anywhere in the tree, not just app/libs.
+*.aar

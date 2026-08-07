@@ -1,12 +1,21 @@
 # Put the Nosmai SDK here
 
+Download the latest `nosmai-release.aar` from the releases page:
+
+**https://github.com/nosmai/camera-sdk-android/releases**
+
+and drop it in as:
+
 ```
 app/libs/nosmai-release.aar
 ```
 
-The AAR is distributed separately and is deliberately not committed
-(`.gitignore` excludes `app/libs/*.aar`). Nothing else resolves it, so the build
-fails until you drop your copy in.
+The AAR is **not committed** to this repository — it is ~36 MB, and a pinned copy
+would go stale the moment a new SDK build ships. Taking it from releases each
+time is how you get the current one. `.gitignore` excludes `*.aar` so a local
+copy cannot be committed by accident.
+
+Nothing else resolves it, so the build fails until you drop your copy in.
 
 It is referenced from two places, both already wired up:
 

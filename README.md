@@ -72,9 +72,13 @@ Two details inside that, both handled in `AgoraManager.setUpTextureStreaming`:
 app/libs/nosmai-release.aar
 ```
 
-The AAR is not in this repository — it is distributed separately, and
-`.gitignore` keeps it out. Nothing else resolves it, so the build fails without
-it.
+Download the latest build from the releases page:
+
+**https://github.com/nosmai/camera-sdk-android/releases**
+
+The AAR is not committed here — it is ~36 MB and would go stale the moment a new
+SDK build ships, so always take it from releases. Nothing else resolves it, so
+the build fails until you drop your copy in.
 
 **2. Set your licence key and applicationId**
 
@@ -146,7 +150,7 @@ to the stream's real aspect and never crops.
 | minSdk | 21 |
 | ABI | **arm64-v8a only** — the SDK ships one ABI |
 | Device | A real arm64 device. The camera and GPU paths do not work on an emulator. |
-| Nosmai SDK | `nosmai-release.aar`, distributed separately |
+| Nosmai SDK | `nosmai-release.aar` — from [releases](https://github.com/nosmai/camera-sdk-android/releases) |
 | Nosmai licence key | Bound to an `applicationId` — see above |
 | Agora | An App ID, and a token if your project is in secured mode |
 
